@@ -1,25 +1,14 @@
 const state = {
-  token: localStorage.getItem("token"),
-  user: null,
-  mode: "login",
+  jobIds: JSON.parse(localStorage.getItem("jobIds") || "[]"),
   poll: null,
 };
 
-const authPanel = document.querySelector("#authPanel");
-const appPanel = document.querySelector("#appPanel");
-const authForm = document.querySelector("#authForm");
-const authSubmit = document.querySelector("#authSubmit");
-const authMessage = document.querySelector("#authMessage");
-const termsPanel = document.querySelector("#termsPanel");
-const downloadPanel = document.querySelector("#downloadPanel");
-const termsCheckbox = document.querySelector("#termsCheckbox");
+const downloadForm = document.querySelector("#downloadForm");
 const jobsEl = document.querySelector("#jobs");
+const messageEl = document.querySelector("#message");
 
-function headers() {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${state.token}`,
-  };
+function saveJobIds() {
+  localStorage.setItem("jobIds", JSON.stringify(state.jobIds.slice(0, 25)));
 }
 
 async function api(path, options = {}) {
@@ -33,27 +22,13 @@ async function api(path, options = {}) {
 }
 
 function setMessage(text, isError = false) {
-  authMessage.textContent = text;
-  authMessage.style.color = isError ? "#b3261e" : "#646464";
-}
-
-function renderSession() {
-  const signedIn = Boolean(state.token && state.user);
-  authPanel.classList.toggle("hidden", signedIn);
-  appPanel.classList.toggle("hidden", !signedIn);
-  if (!signedIn) return;
-
-  termsPanel.classList.toggle("hidden", state.user.termsAccepted);
-  downloadPanel.classList.toggle("hidden", !state.user.termsAccepted);
-  if (state.user.termsAccepted) {
-    loadJobs();
-    state.poll ||= setInterval(loadJobs, 3000);
-  }
+  messageEl.textContent = text;
+  messageEl.style.color = isError ? "#b3261e" : "#646464";
 }
 
 function renderJobs(jobs) {
   if (!jobs.length) {
-    jobsEl.innerHTML = `<p class="hint">No exports yet.</p>`;
+    jobsEl.innerHTML = `<p class="hint">No downloads yet.</p>`;
     return;
   }
 
@@ -78,94 +53,51 @@ function renderJobs(jobs) {
     .join("");
 }
 
-async function loadMe() {
-  if (!state.token) return;
-  try {
-    state.user = await api("/api/me", { headers: headers() });
-  } catch {
-    localStorage.removeItem("token");
-    state.token = null;
-    state.user = null;
-  }
-}
-
 async function loadJobs() {
-  if (!state.token || !state.user?.termsAccepted) return;
-  try {
-    const jobs = await api("/api/downloads", { headers: headers() });
-    renderJobs(jobs);
-  } catch (error) {
-    jobsEl.innerHTML = `<p class="hint">${error.message}</p>`;
+  if (!state.jobIds.length) {
+    renderJobs([]);
+    return;
   }
+
+  const results = await Promise.allSettled(
+    state.jobIds.map((id) => api(`/api/downloads/${id}`)),
+  );
+  const jobs = results
+    .filter((result) => result.status === "fulfilled")
+    .map((result) => result.value);
+  renderJobs(jobs);
 }
 
-document.querySelectorAll(".tab").forEach((tab) => {
-  tab.addEventListener("click", () => {
-    state.mode = tab.dataset.mode;
-    document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
-    tab.classList.add("active");
-    authSubmit.textContent = state.mode === "login" ? "Sign in" : "Create account";
-    setMessage("");
-  });
-});
+function startPolling() {
+  if (state.poll) return;
+  state.poll = setInterval(loadJobs, 3000);
+}
 
-authForm.addEventListener("submit", async (event) => {
+downloadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const form = new FormData(authForm);
-  const payload = {
-    email: form.get("email"),
-    password: form.get("password"),
-  };
+  const form = new FormData(event.currentTarget);
+  const submit = event.currentTarget.querySelector("button");
 
-  authSubmit.disabled = true;
-  setMessage("Working...");
+  submit.disabled = true;
+  setMessage("Starting download...");
   try {
-    const session = await api(`/api/auth/${state.mode}`, {
+    const job = await api("/api/downloads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ url: form.get("url") }),
     });
-    state.token = session.access_token;
-    state.user = session.user;
-    localStorage.setItem("token", state.token);
-    setMessage("");
-    renderSession();
+    state.jobIds = [job.id, ...state.jobIds.filter((id) => id !== job.id)];
+    saveJobIds();
+    event.currentTarget.reset();
+    setMessage("Download queued.");
+    await loadJobs();
+    startPolling();
   } catch (error) {
     setMessage(error.message, true);
   } finally {
-    authSubmit.disabled = false;
+    submit.disabled = false;
   }
 });
 
-document.querySelector("#acceptTermsButton").addEventListener("click", async () => {
-  if (!termsCheckbox.checked) return;
-  state.user = await api("/api/terms", {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ accepted: true }),
-  });
-  renderSession();
-});
-
-document.querySelector("#downloadForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  await api("/api/downloads", {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({ url: form.get("url") }),
-  });
-  event.currentTarget.reset();
-  await loadJobs();
-});
-
-document.querySelector("#signOutButton").addEventListener("click", () => {
-  localStorage.removeItem("token");
-  state.token = null;
-  state.user = null;
-  if (state.poll) clearInterval(state.poll);
-  state.poll = null;
-  renderSession();
-});
-
-loadMe().then(renderSession);
+loadJobs();
+startPolling();

@@ -15,17 +15,10 @@ This repo is prepared for Railway's GitHub flow:
 4. Let Railway create the service and start the first deploy.
 5. Open the service, go to `Variables`, and add:
    - `APP_APP_ORIGIN=https://your-domain.com`
-   - `APP_JWT_SECRET=<long random secret>`
    - `APP_DATABASE_PATH=/app/data/app.db`
    - `APP_DOWNLOADS_DIR=/app/data/downloads`
    - `APP_MAX_CONCURRENT_JOBS=2`
 6. Redeploy after adding variables.
-
-Generate a strong secret locally with:
-
-```bash
-openssl rand -hex 32
-```
 
 ## Add Persistent Storage
 
@@ -40,10 +33,8 @@ This preserves the SQLite database and generated zip archives across deploys.
 
 1. In the service `Networking` tab, generate a Railway domain.
 2. Visit the generated URL.
-3. Create an account.
-4. Accept the terms.
-5. Try one short YouTube or SoundCloud playlist first.
-6. Confirm the job reaches `complete` and the zip link downloads.
+3. Try one short YouTube or SoundCloud playlist first.
+4. Confirm the job reaches `complete` and the zip link downloads.
 
 ## Add Your Own Domain
 
@@ -65,6 +56,5 @@ Using a subdomain is usually smoother than the root/apex domain. If you want the
 
 ## Before Public Launch
 
-- Replace the placeholder legal copy with real terms reviewed for your use case.
 - Add quotas or billing before opening signups broadly.
 - Move jobs to a separate worker and store archives in object storage once downloads get large.

@@ -33,7 +33,7 @@ def infer_source(url: str) -> str:
     raise ValueError("Unsupported source.")
 
 
-def create_job(user_id: int, url: str) -> dict:
+def create_job(url: str) -> dict:
     from .db import connect, now_iso
 
     source = infer_source(url)
@@ -42,10 +42,10 @@ def create_job(user_id: int, url: str) -> dict:
     with connect() as db:
         db.execute(
             """
-            INSERT INTO jobs (id, user_id, source, url, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO jobs (id, source, url, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (job_id, user_id, source, url, "queued", timestamp, timestamp),
+            (job_id, source, url, "queued", timestamp, timestamp),
         )
         job = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
 
@@ -54,23 +54,19 @@ def create_job(user_id: int, url: str) -> dict:
     return job
 
 
-def get_job(job_id: str, user_id: int) -> dict | None:
+def get_job(job_id: str) -> dict | None:
+    from .db import connect
+
+    with connect() as db:
+        return db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+
+
+def list_jobs() -> list[dict]:
     from .db import connect
 
     with connect() as db:
         return db.execute(
-            "SELECT * FROM jobs WHERE id = ? AND user_id = ?",
-            (job_id, user_id),
-        ).fetchone()
-
-
-def list_jobs(user_id: int) -> list[dict]:
-    from .db import connect
-
-    with connect() as db:
-        return db.execute(
-            "SELECT * FROM jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT 25",
-            (user_id,),
+            "SELECT * FROM jobs ORDER BY created_at DESC LIMIT 25",
         ).fetchall()
 
 
@@ -95,6 +91,12 @@ def command_for(source: str, url: str, output_dir: Path) -> list[str]:
             str(output_dir),
             "--onlymp3",
             "-c",
+            "--force-metadata",
+            "--addtofile",
+            "--playlist-name-format",
+            "{artist} - {title}",
+            "--name-format",
+            "{artist} - {title}",
             "--hidewarnings",
         ]
 
@@ -109,10 +111,14 @@ def command_for(source: str, url: str, output_dir: Path) -> list[str]:
         "mp3",
         "--embed-metadata",
         "--embed-thumbnail",
+        "--parse-metadata",
+        "%(artist,uploader,channel)s:%(meta_artist)s",
+        "--parse-metadata",
+        "%(title)s:%(meta_title)s",
         "--paths",
         str(output_dir),
         "-o",
-        "%(playlist_index|00)s-%(title).180B.%(ext)s",
+        "%(artist,uploader,channel|Unknown Artist).120B - %(title).180B.%(ext)s",
         url,
     ]
 
