@@ -125,7 +125,6 @@ def command_for(source: str, url: str, output_dir: Path) -> list[str]:
             "--path",
             str(output_dir),
             "--onlymp3",
-            "-c",
             "--force-metadata",
             "--addtofile",
             "--playlist-name-format",
