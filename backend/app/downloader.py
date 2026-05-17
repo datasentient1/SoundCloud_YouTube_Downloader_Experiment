@@ -3,7 +3,7 @@ import subprocess
 import threading
 import uuid
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 ALLOWED_HOSTS = {
     "youtube.com",
@@ -33,9 +33,44 @@ def infer_source(url: str) -> str:
     raise ValueError("Unsupported source.")
 
 
+def normalize_url(url: str) -> str:
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+
+    if host in SOURCE_HOSTS["soundcloud"]:
+        query = parse_qs(parsed.query)
+        playlist_context = query.get("in", [""])[0].strip("/")
+        if "/sets/" in playlist_context:
+            return f"https://soundcloud.com/{playlist_context}"
+        if "/sets/" not in parsed.path:
+            raise ValueError("Paste a SoundCloud playlist URL, such as https://soundcloud.com/artist/sets/playlist.")
+        return urlunparse((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", "", ""))
+
+    if host in SOURCE_HOSTS["youtube"]:
+        query = parse_qs(parsed.query)
+        kept_query = {
+            key: values[0]
+            for key, values in query.items()
+            if key in {"list", "v"} and values
+        }
+        return urlunparse(
+            (
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                "",
+                urlencode(kept_query),
+                "",
+            )
+        )
+
+    return url
+
+
 def create_job(url: str) -> dict:
     from .db import connect, now_iso
 
+    url = normalize_url(url)
     source = infer_source(url)
     job_id = uuid.uuid4().hex
     timestamp = now_iso()
@@ -94,9 +129,9 @@ def command_for(source: str, url: str, output_dir: Path) -> list[str]:
             "--force-metadata",
             "--addtofile",
             "--playlist-name-format",
-            "{artist} - {title}",
+            "{user[username]} - {title}",
             "--name-format",
-            "{artist} - {title}",
+            "{user[username]} - {title}",
             "--hidewarnings",
         ]
 
@@ -144,6 +179,7 @@ def run_job(job_id: str) -> None:
     with _semaphore:
         update_job(job_id, status="running", progress="Starting download...")
         try:
+            last_line = ""
             process = subprocess.Popen(
                 command_for(job["source"], job["url"], media_dir),
                 stdout=subprocess.PIPE,
@@ -155,11 +191,13 @@ def run_job(job_id: str) -> None:
             for line in process.stdout:
                 cleaned = line.strip()
                 if cleaned:
+                    last_line = cleaned[-500:]
                     update_job(job_id, progress=cleaned[-500:])
 
             return_code = process.wait()
             if return_code != 0:
-                raise RuntimeError(f"Downloader exited with code {return_code}.")
+                detail = f": {last_line}" if last_line else "."
+                raise RuntimeError(f"Downloader exited with code {return_code}{detail}")
 
             archive_base = job_dir / "catalog"
             archive_path = Path(shutil.make_archive(str(archive_base), "zip", media_dir))

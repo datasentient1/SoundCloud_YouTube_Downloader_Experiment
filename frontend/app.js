@@ -75,8 +75,9 @@ function startPolling() {
 
 downloadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  const submit = event.currentTarget.querySelector("button");
+  const formEl = event.currentTarget;
+  const form = new FormData(formEl);
+  const submit = formEl.querySelector("button");
 
   submit.disabled = true;
   setMessage("Starting download...");
@@ -88,7 +89,7 @@ downloadForm.addEventListener("submit", async (event) => {
     });
     state.jobIds = [job.id, ...state.jobIds.filter((id) => id !== job.id)];
     saveJobIds();
-    event.currentTarget.reset();
+    formEl.reset();
     setMessage("Download queued.");
     await loadJobs();
     startPolling();
