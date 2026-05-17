@@ -1,0 +1,290 @@
+:root {
+  color-scheme: light;
+  --ink: #171717;
+  --muted: #646464;
+  --line: #d9ddd8;
+  --panel: #ffffff;
+  --field: #f7f8f5;
+  --accent: #12726b;
+  --accent-strong: #0d5c56;
+  --warn: #9c4f16;
+  --failed: #b3261e;
+  --ready: #246b38;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #eef1ed;
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.shell {
+  width: min(1040px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0;
+}
+
+.auth-panel,
+.app-panel {
+  display: grid;
+  gap: 32px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 32px;
+  box-shadow: 0 16px 60px rgba(20, 31, 28, 0.08);
+}
+
+.auth-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  align-items: start;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 16px;
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+h2 {
+  margin-bottom: 12px;
+  font-size: 1.15rem;
+}
+
+.lede {
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  max-width: 56ch;
+}
+
+.form,
+.download-form {
+  display: grid;
+  gap: 16px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tab {
+  min-height: 44px;
+  border: 0;
+  background: #fff;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: var(--ink);
+  color: #fff;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  color: #3d4240;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  padding: 0 14px;
+}
+
+input:focus {
+  border-color: var(--accent);
+  outline: 3px solid rgba(18, 114, 107, 0.16);
+}
+
+.primary,
+.secondary {
+  min-height: 46px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.primary:hover {
+  background: var(--accent-strong);
+}
+
+.secondary {
+  background: #fff;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.message,
+.hint {
+  min-height: 22px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.topbar h1 {
+  margin-bottom: 0;
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
+}
+
+.terms,
+.download {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+
+.terms p {
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 76ch;
+}
+
+.checkbox {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  margin: 18px 0;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.checkbox input {
+  width: 18px;
+  min-height: 18px;
+  margin-top: 2px;
+}
+
+.download-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.jobs {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.job {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.job-url,
+.job-progress {
+  overflow-wrap: anywhere;
+}
+
+.job-url {
+  margin-bottom: 8px;
+  font-weight: 800;
+}
+
+.job-progress {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.status {
+  align-self: start;
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #fff;
+  background: var(--warn);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.status.complete {
+  background: var(--ready);
+}
+
+.status.failed {
+  background: var(--failed);
+}
+
+.archive {
+  color: var(--accent);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    width: min(100% - 20px, 1040px);
+    padding: 16px 0;
+  }
+
+  .auth-panel,
+  .app-panel {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .topbar,
+  .download-form,
+  .job {
+    grid-template-columns: 1fr;
+  }
+}

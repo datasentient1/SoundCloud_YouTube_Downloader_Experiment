@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Artist Catalog Downloader</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="auth-panel" id="authPanel">
+        <div>
+          <p class="eyebrow">Private catalog export</p>
+          <h1>Artist Catalog Downloader</h1>
+          <p class="lede">Sign in, accept the usage terms, and export your own YouTube or SoundCloud playlists as a zipped audio catalog.</p>
+        </div>
+        <form id="authForm" class="form">
+          <div class="tabs" role="tablist" aria-label="Authentication mode">
+            <button type="button" class="tab active" data-mode="login">Sign in</button>
+            <button type="button" class="tab" data-mode="register">Create account</button>
+          </div>
+          <label>
+            Email
+            <input name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" autocomplete="current-password" minlength="8" required />
+          </label>
+          <button class="primary" type="submit" id="authSubmit">Sign in</button>
+          <p class="message" id="authMessage"></p>
+        </form>
+      </section>
+
+      <section class="app-panel hidden" id="appPanel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Catalog workspace</p>
+            <h1>Playlist exports</h1>
+          </div>
+          <button class="secondary" id="signOutButton" type="button">Sign out</button>
+        </header>
+
+        <section class="terms" id="termsPanel">
+          <h2>Terms of service</h2>
+          <p>Use this service only for music you own, control, or have explicit permission to download. You are responsible for complying with copyright law and each platform's terms.</p>
+          <label class="checkbox">
+            <input type="checkbox" id="termsCheckbox" />
+            I agree and confirm I have rights to download the submitted catalog.
+          </label>
+          <button class="primary" id="acceptTermsButton" type="button">Accept terms</button>
+        </section>
+
+        <section class="download hidden" id="downloadPanel">
+          <form id="downloadForm" class="download-form">
+            <label>
+              Playlist URL
+              <input name="url" type="url" placeholder="https://soundcloud.com/artist/sets/playlist" required />
+            </label>
+            <button class="primary" type="submit">Start export</button>
+          </form>
+          <p class="hint">Supported sources: YouTube playlists, YouTube Music playlists, and SoundCloud playlists.</p>
+          <div class="jobs" id="jobs"></div>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
