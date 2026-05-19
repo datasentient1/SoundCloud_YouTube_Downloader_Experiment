@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Playlist MP3 Downloader</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles.css?v=log-ui-2026-05-18-02" />
   </head>
   <body>
     <main class="shell">
@@ -13,7 +13,7 @@
           <div>
             <p class="eyebrow">SoundCloud + YouTube</p>
             <h1>Playlist MP3 Downloader</h1>
-            <p class="lede">Paste a public playlist URL and download a zip of MP3 files named with artist and track titles when the source provides that metadata.</p>
+            <p class="lede">Paste a public playlist URL and create a zip of MP3 files named with artist and track titles when the source provides that metadata.</p>
           </div>
         </header>
 
@@ -22,14 +22,15 @@
             Playlist URL
             <input name="url" type="url" placeholder="https://soundcloud.com/artist/sets/playlist" required />
           </label>
-          <button class="primary" type="submit">Download MP3s</button>
+          <button class="primary" type="submit">Start job</button>
         </form>
 
         <p class="hint">Supported sources: public YouTube playlists, YouTube Music playlists, and SoundCloud playlists.</p>
+        <p class="hint">Build: log-ui-2026-05-18-02</p>
         <p class="message" id="message"></p>
         <div class="jobs" id="jobs"></div>
       </section>
     </main>
-    <script src="/app.js"></script>
+    <script src="/app.js?v=log-ui-2026-05-18-02"></script>
   </body>
 </html>
