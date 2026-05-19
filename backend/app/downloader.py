@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import threading
@@ -116,7 +117,39 @@ def update_job(job_id: str, **fields: str | None) -> None:
         db.execute(f"UPDATE jobs SET {assignments} WHERE id = ?", values)
 
 
-def command_for(source: str, url: str, output_dir: Path) -> list[str]:
+def youtube_extra_args(job_dir: Path) -> list[str]:
+    """Return optional yt-dlp network/auth arguments from deployment settings.
+
+    Public YouTube URLs usually work without cookies. Some hosting providers' IP
+    ranges are challenged by YouTube, though. In that case, the operator can set
+    either APP_YTDLP_COOKIES_PATH or APP_YTDLP_COOKIES. The latter is written to
+    a per-job file so the cookie contents are never exposed in the command line.
+    """
+    from .config import get_settings
+
+    settings = get_settings()
+    args = []
+
+    if settings.ytdlp_impersonate:
+        args.extend(["--impersonate", settings.ytdlp_impersonate])
+
+    if settings.ytdlp_cookies_path:
+        cookie_path = Path(settings.ytdlp_cookies_path)
+        if cookie_path.exists():
+            args.extend(["--cookies", str(cookie_path)])
+            return args
+
+    if settings.ytdlp_cookies:
+        cookie_path = job_dir / "youtube.cookies.txt"
+        cookie_path.write_text(settings.ytdlp_cookies, encoding="utf-8")
+        os.chmod(cookie_path, 0o600)
+        args.extend(["--cookies", str(cookie_path)])
+        return args
+
+    return args
+
+
+def command_for(source: str, url: str, output_dir: Path, job_dir: Path | None = None) -> list[str]:
     if source == "soundcloud":
         return [
             "scdl",
@@ -134,27 +167,47 @@ def command_for(source: str, url: str, output_dir: Path) -> list[str]:
             "--hidewarnings",
         ]
 
+    extra_args = youtube_extra_args(job_dir or output_dir.parent)
     return [
         "yt-dlp",
+        "--newline",
         "--yes-playlist",
-        "--ignore-errors",
+        "--no-abort-on-error",
         "--no-overwrites",
         "--restrict-filenames",
+        "--format",
+        "bestaudio/best",
         "--extract-audio",
         "--audio-format",
         "mp3",
-        "--embed-metadata",
+        "--prefer-ffmpeg",
+        "--convert-thumbnails",
+        "jpg",
         "--embed-thumbnail",
+        "--embed-metadata",
         "--parse-metadata",
-        "%(artist,uploader,channel)s:%(meta_artist)s",
+        "%(uploader|)s:%(meta_artist)s",
         "--parse-metadata",
         "%(title)s:%(meta_title)s",
+        "--retries",
+        "10",
+        "--fragment-retries",
+        "10",
+        "--extractor-retries",
+        "3",
+        "--socket-timeout",
+        "30",
         "--paths",
         str(output_dir),
         "-o",
         "%(artist,uploader,channel|Unknown Artist).120B - %(title).180B.%(ext)s",
+        *extra_args,
         url,
     ]
+
+
+def media_files(media_dir: Path) -> list[Path]:
+    return [path for path in media_dir.rglob("*") if path.is_file() and path.name != ".DS_Store"]
 
 
 def run_job(job_id: str) -> None:
@@ -174,29 +227,42 @@ def run_job(job_id: str) -> None:
     job_dir = settings.downloads_dir / job_id
     media_dir = job_dir / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
+    log_path = job_dir / "downloader.log"
 
     with _semaphore:
         update_job(job_id, status="running", progress="Starting download...")
         try:
             last_line = ""
-            process = subprocess.Popen(
-                command_for(job["source"], job["url"], media_dir),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-            )
-            assert process.stdout is not None
-            for line in process.stdout:
-                cleaned = line.strip()
-                if cleaned:
-                    last_line = cleaned[-500:]
-                    update_job(job_id, progress=cleaned[-500:])
+            command = command_for(job["source"], job["url"], media_dir, job_dir)
+            with log_path.open("w", encoding="utf-8", errors="replace") as log_file:
+                process = subprocess.Popen(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                )
+                assert process.stdout is not None
+                for line in process.stdout:
+                    cleaned = line.strip()
+                    log_file.write(line)
+                    log_file.flush()
+                    if cleaned:
+                        last_line = cleaned[-500:]
+                        update_job(job_id, progress=cleaned[-500:])
 
-            return_code = process.wait()
+                return_code = process.wait()
+
             if return_code != 0:
-                detail = f": {last_line}" if last_line else "."
+                detail = f": {last_line}" if last_line else f". See {log_path}."
                 raise RuntimeError(f"Downloader exited with code {return_code}{detail}")
+
+            files = media_files(media_dir)
+            if not files:
+                raise RuntimeError(
+                    "Downloader finished but produced no media files. "
+                    "For YouTube, this commonly means the host IP was challenged or the playlist is unavailable."
+                )
 
             archive_base = job_dir / "catalog"
             archive_path = Path(shutil.make_archive(str(archive_base), "zip", media_dir))
