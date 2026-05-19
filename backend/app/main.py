@@ -2,7 +2,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
@@ -51,6 +51,19 @@ def download_status(job_id: str) -> dict:
     if not job:
         raise HTTPException(status_code=404, detail="Download job not found.")
     return job
+
+
+@app.get("/api/downloads/{job_id}/log")
+def download_log(job_id: str) -> PlainTextResponse:
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Download job not found.")
+
+    log_path = settings.downloads_dir / job_id / "downloader.log"
+    if not log_path.exists():
+        raise HTTPException(status_code=404, detail="Log is not available yet.")
+
+    return PlainTextResponse(log_path.read_text(encoding="utf-8", errors="replace"))
 
 
 @app.get("/api/downloads/{job_id}/archive")
