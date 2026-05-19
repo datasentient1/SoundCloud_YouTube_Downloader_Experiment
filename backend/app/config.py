@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     downloads_dir: Path = Path("data/downloads")
     max_concurrent_jobs: int = 2
     job_retention_hours: int = 24
+    ytdlp_cookies_path: Path | None = None
+    ytdlp_cookies: str | None = None
+    ytdlp_impersonate: str | None = "chrome"
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="APP_")
 
