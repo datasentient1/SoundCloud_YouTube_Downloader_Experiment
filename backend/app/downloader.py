@@ -20,6 +20,29 @@ SOURCE_HOSTS = {
     "soundcloud": {"soundcloud.com", "www.soundcloud.com"},
 }
 
+AUDIO_SUFFIXES = {
+    ".aac",
+    ".flac",
+    ".m4a",
+    ".mp3",
+    ".oga",
+    ".ogg",
+    ".opus",
+    ".wav",
+    ".webm",
+}
+
+TRANSIENT_SUFFIXES = {
+    ".aria2",
+    ".description",
+    ".part",
+    ".temp",
+    ".tmp",
+    ".url",
+    ".webloc",
+    ".ytdl",
+}
+
 _semaphore: threading.Semaphore | None = None
 
 
@@ -207,7 +230,29 @@ def command_for(source: str, url: str, output_dir: Path, job_dir: Path | None = 
 
 
 def media_files(media_dir: Path) -> list[Path]:
-    return [path for path in media_dir.rglob("*") if path.is_file() and path.name != ".DS_Store"]
+    return [
+        path
+        for path in media_dir.rglob("*")
+        if path.is_file()
+        and path.name != ".DS_Store"
+        and path.suffix.lower() not in TRANSIENT_SUFFIXES
+    ]
+
+
+def audio_files(media_dir: Path) -> list[Path]:
+    return [path for path in media_files(media_dir) if path.suffix.lower() in AUDIO_SUFFIXES]
+
+
+def archive_media(job_id: str, job_dir: Path, media_dir: Path, progress: str) -> None:
+    archive_base = job_dir / "catalog"
+    archive_path = Path(shutil.make_archive(str(archive_base), "zip", media_dir))
+    update_job(
+        job_id,
+        status="complete",
+        progress=progress,
+        archive_path=str(archive_path),
+        error=None,
+    )
 
 
 def run_job(job_id: str) -> None:
@@ -253,25 +298,28 @@ def run_job(job_id: str) -> None:
 
                 return_code = process.wait()
 
+            downloaded_audio = audio_files(media_dir)
+            if downloaded_audio:
+                if return_code == 0:
+                    archive_media(job_id, job_dir, media_dir, "Archive ready.")
+                    return
+
+                archive_media(
+                    job_id,
+                    job_dir,
+                    media_dir,
+                    f"Archive ready with warnings. Downloader exited with code {return_code}: {last_line}",
+                )
+                return
+
+            detail = f": {last_line}" if last_line else f". See {log_path}."
             if return_code != 0:
-                detail = f": {last_line}" if last_line else f". See {log_path}."
                 raise RuntimeError(f"Downloader exited with code {return_code}{detail}")
 
-            files = media_files(media_dir)
-            if not files:
-                raise RuntimeError(
-                    "Downloader finished but produced no media files. "
-                    "For YouTube, this commonly means the host IP was challenged or the playlist is unavailable."
-                )
-
-            archive_base = job_dir / "catalog"
-            archive_path = Path(shutil.make_archive(str(archive_base), "zip", media_dir))
-            update_job(
-                job_id,
-                status="complete",
-                progress="Archive ready.",
-                archive_path=str(archive_path),
-                error=None,
+            raise RuntimeError(
+                "Downloader finished but produced no audio files. "
+                "For YouTube, this commonly means the host IP was challenged, the playlist is unavailable, "
+                "or post-processing failed before an MP3 was written."
             )
         except Exception as exc:
             update_job(job_id, status="failed", error=str(exc), progress="Download failed.")
