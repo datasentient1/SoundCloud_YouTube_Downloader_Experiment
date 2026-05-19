@@ -1,3 +1,5 @@
+import shutil
+import subprocess
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -9,6 +11,8 @@ from .config import get_settings
 from .db import init_db
 from .downloader import create_job, get_job, list_jobs
 from .schemas import DownloadInput
+
+APP_BUILD_ID = "yt-dlp-debug-2026-05-18-01"
 
 app = FastAPI(title="Playlist MP3 Downloader")
 
@@ -27,9 +31,38 @@ def startup() -> None:
     init_db()
 
 
+def command_version(command: str) -> str | None:
+    path = shutil.which(command)
+    if not path:
+        return None
+    try:
+        result = subprocess.run(
+            [command, "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except Exception as exc:
+        return f"{path}: version check failed: {exc}"
+    version = (result.stdout or result.stderr).strip().splitlines()
+    return f"{path}: {version[0] if version else 'installed'}"
+
+
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "build_id": APP_BUILD_ID}
+
+
+@app.get("/api/debug/runtime")
+def runtime_debug() -> dict:
+    return {
+        "build_id": APP_BUILD_ID,
+        "yt_dlp": command_version("yt-dlp"),
+        "ffmpeg": command_version("ffmpeg"),
+        "downloads_dir": str(settings.downloads_dir),
+        "database_path": str(settings.database_path),
+    }
 
 
 @app.post("/api/downloads")
