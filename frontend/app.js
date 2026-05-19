@@ -7,6 +7,9 @@ const state = {
 const downloadForm = document.querySelector("#downloadForm");
 const jobsEl = document.querySelector("#jobs");
 const messageEl = document.querySelector("#message");
+const latestLogBox = document.querySelector("#latestLogBox");
+const reloadLatestLogButton = document.querySelector("#reloadLatestLog");
+const copyLatestLogButton = document.querySelector("#copyLatestLog");
 
 function saveJobIds() {
   localStorage.setItem("jobIds", JSON.stringify(state.jobIds.slice(0, 25)));
@@ -47,6 +50,16 @@ function escapeHtml(value) {
 
 function logTextFor(job) {
   return state.logs[job.id] || "Log not loaded yet. Wait a few seconds, or click Reload log after the job starts.";
+}
+
+function updateLatestLogBox(text) {
+  if (latestLogBox) {
+    latestLogBox.value = text || "No downloader log loaded yet.";
+  }
+}
+
+function newestJobId() {
+  return state.jobIds[0] || null;
 }
 
 function renderJobs(jobs) {
@@ -98,6 +111,22 @@ async function loadJobLog(jobId, force = false) {
   }
 }
 
+async function loadLatestLog(force = true) {
+  let jobId = newestJobId();
+  if (!jobId) {
+    const jobs = await loadRecentJobs();
+    jobId = jobs[0]?.id || null;
+  }
+
+  if (!jobId) {
+    updateLatestLogBox("No jobs found yet. Start a job first.");
+    return;
+  }
+
+  await loadJobLog(jobId, force);
+  updateLatestLogBox(state.logs[jobId]);
+}
+
 async function loadRecentJobs() {
   const jobs = await api("/api/downloads");
   state.jobIds = jobs.map((job) => job.id);
@@ -131,6 +160,11 @@ async function loadJobs() {
     }),
   );
 
+  const latestId = newestJobId();
+  if (latestId && state.logs[latestId]) {
+    updateLatestLogBox(state.logs[latestId]);
+  }
+
   renderJobs(jobs);
 }
 
@@ -157,6 +191,7 @@ jobsEl.addEventListener("click", async (event) => {
   try {
     if (action === "reload-log") {
       await loadJobLog(jobId, true);
+      updateLatestLogBox(state.logs[jobId]);
       setMessage("Log reloaded.");
       await loadJobs();
     }
@@ -170,6 +205,30 @@ jobsEl.addEventListener("click", async (event) => {
   }
 });
 
+reloadLatestLogButton?.addEventListener("click", async () => {
+  reloadLatestLogButton.disabled = true;
+  try {
+    await loadLatestLog(true);
+    setMessage("Latest log reloaded.");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    reloadLatestLogButton.disabled = false;
+  }
+});
+
+copyLatestLogButton?.addEventListener("click", async () => {
+  copyLatestLogButton.disabled = true;
+  try {
+    await navigator.clipboard.writeText(latestLogBox?.value || "");
+    setMessage("Latest log copied to clipboard.");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    copyLatestLogButton.disabled = false;
+  }
+});
+
 downloadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formEl = event.currentTarget;
@@ -178,6 +237,7 @@ downloadForm.addEventListener("submit", async (event) => {
 
   submit.disabled = true;
   setMessage("Starting download...");
+  updateLatestLogBox("Job submitted. Waiting for downloader log...");
   try {
     const job = await api("/api/downloads", {
       method: "POST",
