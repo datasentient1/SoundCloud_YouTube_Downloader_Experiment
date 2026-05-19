@@ -26,6 +26,15 @@ function setMessage(text, isError = false) {
   messageEl.style.color = isError ? "#b3261e" : "#646464";
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function renderJobs(jobs) {
   if (!jobs.length) {
     jobsEl.innerHTML = `<p class="hint">No downloads yet.</p>`;
@@ -38,15 +47,17 @@ function renderJobs(jobs) {
         job.status === "complete"
           ? `<a class="archive" href="/api/downloads/${job.id}/archive" target="_blank" rel="noreferrer">Download zip</a>`
           : "";
+      const log = `<a class="archive" href="/api/downloads/${job.id}/log" target="_blank" rel="noreferrer">View log</a>`;
       const detail = job.error || job.progress || "Queued.";
       return `
         <article class="job">
           <div>
-            <div class="job-url">${job.url}</div>
-            <p class="job-progress">${detail}</p>
+            <div class="job-url">${escapeHtml(job.url)}</div>
+            <p class="job-progress">${escapeHtml(detail)}</p>
             ${archive}
+            ${log}
           </div>
-          <span class="status ${job.status}">${job.status}</span>
+          <span class="status ${job.status}">${escapeHtml(job.status)}</span>
         </article>
       `;
     })
