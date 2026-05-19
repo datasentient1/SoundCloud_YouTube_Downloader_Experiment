@@ -1,4 +1,3 @@
-import os
 import shutil
 import subprocess
 import threading
@@ -140,35 +139,13 @@ def update_job(job_id: str, **fields: str | None) -> None:
         db.execute(f"UPDATE jobs SET {assignments} WHERE id = ?", values)
 
 
-def youtube_extra_args(job_dir: Path) -> list[str]:
-    """Return optional yt-dlp network/auth arguments from deployment settings.
-
-    Public YouTube URLs usually work without cookies. Some hosting providers' IP
-    ranges are challenged by YouTube, though. In that case, the operator can set
-    either APP_YTDLP_COOKIES_PATH or APP_YTDLP_COOKIES. The latter is written to
-    a per-job file so the cookie contents are never exposed in the command line.
-    """
+def youtube_extra_args() -> list[str]:
     from .config import get_settings
 
     settings = get_settings()
     args = []
-
-    if settings.ytdlp_impersonate:
+    if getattr(settings, "ytdlp_impersonate", None):
         args.extend(["--impersonate", settings.ytdlp_impersonate])
-
-    if settings.ytdlp_cookies_path:
-        cookie_path = Path(settings.ytdlp_cookies_path)
-        if cookie_path.exists():
-            args.extend(["--cookies", str(cookie_path)])
-            return args
-
-    if settings.ytdlp_cookies:
-        cookie_path = job_dir / "youtube.cookies.txt"
-        cookie_path.write_text(settings.ytdlp_cookies, encoding="utf-8")
-        os.chmod(cookie_path, 0o600)
-        args.extend(["--cookies", str(cookie_path)])
-        return args
-
     return args
 
 
@@ -190,7 +167,6 @@ def command_for(source: str, url: str, output_dir: Path, job_dir: Path | None = 
             "--hidewarnings",
         ]
 
-    extra_args = youtube_extra_args(job_dir or output_dir.parent)
     return [
         "yt-dlp",
         "--newline",
@@ -204,14 +180,6 @@ def command_for(source: str, url: str, output_dir: Path, job_dir: Path | None = 
         "--audio-format",
         "mp3",
         "--prefer-ffmpeg",
-        "--convert-thumbnails",
-        "jpg",
-        "--embed-thumbnail",
-        "--embed-metadata",
-        "--parse-metadata",
-        "%(uploader|)s:%(meta_artist)s",
-        "--parse-metadata",
-        "%(title)s:%(meta_title)s",
         "--retries",
         "10",
         "--fragment-retries",
@@ -223,8 +191,8 @@ def command_for(source: str, url: str, output_dir: Path, job_dir: Path | None = 
         "--paths",
         str(output_dir),
         "-o",
-        "%(artist,uploader,channel|Unknown Artist).120B - %(title).180B.%(ext)s",
-        *extra_args,
+        "%(uploader,channel|Unknown_Artist).120B - %(title).180B.%(ext)s",
+        *youtube_extra_args(),
         url,
     ]
 
@@ -241,6 +209,13 @@ def media_files(media_dir: Path) -> list[Path]:
 
 def audio_files(media_dir: Path) -> list[Path]:
     return [path for path in media_files(media_dir) if path.suffix.lower() in AUDIO_SUFFIXES]
+
+
+def tail_log(log_path: Path, max_lines: int = 40) -> str:
+    if not log_path.exists():
+        return ""
+    lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return "\n".join(lines[-max_lines:])[-4000:]
 
 
 def archive_media(job_id: str, job_dir: Path, media_dir: Path, progress: str) -> None:
@@ -280,6 +255,7 @@ def run_job(job_id: str) -> None:
             last_line = ""
             command = command_for(job["source"], job["url"], media_dir, job_dir)
             with log_path.open("w", encoding="utf-8", errors="replace") as log_file:
+                log_file.write("Command: " + " ".join(command) + "\n\n")
                 process = subprocess.Popen(
                     command,
                     stdout=subprocess.PIPE,
@@ -300,26 +276,19 @@ def run_job(job_id: str) -> None:
 
             downloaded_audio = audio_files(media_dir)
             if downloaded_audio:
-                if return_code == 0:
-                    archive_media(job_id, job_dir, media_dir, "Archive ready.")
-                    return
-
-                archive_media(
-                    job_id,
-                    job_dir,
-                    media_dir,
-                    f"Archive ready with warnings. Downloader exited with code {return_code}: {last_line}",
-                )
+                progress = "Archive ready."
+                if return_code != 0:
+                    progress = f"Archive ready with warnings. Downloader exited with code {return_code}: {last_line}"
+                archive_media(job_id, job_dir, media_dir, progress)
                 return
 
-            detail = f": {last_line}" if last_line else f". See {log_path}."
+            log_tail = tail_log(log_path)
+            detail = log_tail or last_line or f"See {log_path}."
             if return_code != 0:
-                raise RuntimeError(f"Downloader exited with code {return_code}{detail}")
+                raise RuntimeError(f"Downloader exited with code {return_code}: {detail}")
 
             raise RuntimeError(
-                "Downloader finished but produced no audio files. "
-                "For YouTube, this commonly means the host IP was challenged, the playlist is unavailable, "
-                "or post-processing failed before an MP3 was written."
+                "Downloader finished but produced no audio files. Log tail:\n" + detail
             )
         except Exception as exc:
             update_job(job_id, status="failed", error=str(exc), progress="Download failed.")
