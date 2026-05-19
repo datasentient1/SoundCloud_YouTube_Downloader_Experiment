@@ -98,18 +98,31 @@ async function loadJobLog(jobId, force = false) {
   }
 }
 
-async function loadJobs() {
-  if (!state.jobIds.length) {
-    renderJobs([]);
-    return;
-  }
+async function loadRecentJobs() {
+  const jobs = await api("/api/downloads");
+  state.jobIds = jobs.map((job) => job.id);
+  saveJobIds();
+  return jobs;
+}
 
-  const results = await Promise.allSettled(
-    state.jobIds.map((id) => api(`/api/downloads/${id}`)),
-  );
-  const jobs = results
-    .filter((result) => result.status === "fulfilled")
-    .map((result) => result.value);
+async function loadJobs() {
+  let jobs = [];
+
+  if (!state.jobIds.length) {
+    try {
+      jobs = await loadRecentJobs();
+    } catch (error) {
+      renderJobs([]);
+      return;
+    }
+  } else {
+    const results = await Promise.allSettled(
+      state.jobIds.map((id) => api(`/api/downloads/${id}`)),
+    );
+    jobs = results
+      .filter((result) => result.status === "fulfilled")
+      .map((result) => result.value);
+  }
 
   await Promise.allSettled(
     jobs.map((job) => {
