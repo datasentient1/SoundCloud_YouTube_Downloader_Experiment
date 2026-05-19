@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Playlist MP3 Downloader</title>
-    <link rel="stylesheet" href="/styles.css?v=log-ui-2026-05-18-02" />
+    <link rel="stylesheet" href="/styles.css?v=log-ui-2026-05-18-03" />
   </head>
   <body>
     <main class="shell">
@@ -26,11 +26,26 @@
         </form>
 
         <p class="hint">Supported sources: public YouTube playlists, YouTube Music playlists, and SoundCloud playlists.</p>
-        <p class="hint">Build: log-ui-2026-05-18-02</p>
+        <p class="hint">Build: log-ui-2026-05-18-03</p>
         <p class="message" id="message"></p>
+
+        <section class="static-log-panel" aria-labelledby="latestLogTitle">
+          <div class="static-log-header">
+            <div>
+              <h2 id="latestLogTitle">Latest downloader log</h2>
+              <p class="hint">This box is part of the HTML page itself. It fills with the newest job log when available.</p>
+            </div>
+            <div class="job-actions">
+              <button class="small-button" type="button" id="reloadLatestLog">Reload latest log</button>
+              <button class="small-button" type="button" id="copyLatestLog">Copy latest log</button>
+            </div>
+          </div>
+          <textarea id="latestLogBox" class="log-box static-log-box" readonly spellcheck="false">No downloader log loaded yet. Start a job, then click Reload latest log.</textarea>
+        </section>
+
         <div class="jobs" id="jobs"></div>
       </section>
     </main>
-    <script src="/app.js?v=log-ui-2026-05-18-02"></script>
+    <script src="/app.js?v=log-ui-2026-05-18-03"></script>
   </body>
 </html>
